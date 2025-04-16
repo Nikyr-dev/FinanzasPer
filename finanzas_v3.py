@@ -53,16 +53,33 @@ if selected == "Registrar":
 
     st.dataframe(st.session_state.df)
 
-# --- Calendario ---
+
+# --- Calendario corregido ---
 elif selected == "Calendario":
-    st.subheader("Vista de calendario (modo visual en desarrollo)")
+    st.subheader("Calendario de vencimientos")
+
     df = st.session_state.df.copy()
     if not df.empty:
         df["vencimiento"] = pd.to_datetime(df["vencimiento"], errors="coerce")
-        df["estado"] = df["vencimiento"].apply(lambda x: "Resuelto" if x < pd.Timestamp.today() else "Pendiente")
-        st.dataframe(df[["detalle", "vencimiento", "prioridad", "estado"]])
+        vencimientos_mes = df[df["vencimiento"].notna()]
+        vencimientos_mes["día"] = vencimientos_mes["vencimiento"].dt.strftime("%d-%b")
+
+        # Mostrar resumen por día
+        resumen = vencimientos_mes.groupby("día")[["detalle", "monto", "prioridad"]].agg(lambda x: ', '.join(map(str, x)))
+        st.dataframe(resumen)
+
+        # Tabla colorida por vencimiento
+        st.markdown("### Vista simplificada")
+        for _, row in vencimientos_mes.iterrows():
+            color = "🟢"
+            if row["vencimiento"].date() < datetime.today().date():
+                color = "🔴"
+            elif (row["vencimiento"].date() - datetime.today().date()).days <= 7:
+                color = "🟡"
+            st.markdown(f"{color} `{row['vencimiento'].date()}` → **{row['detalle']}** (${row['monto']}) – `{row['prioridad']}`")
     else:
-        st.info("No hay datos registrados aún.")
+        st.info("No hay datos registrados con vencimiento.")
+
 
 # --- Proyección Anual ---
 elif selected == "Proyección":
