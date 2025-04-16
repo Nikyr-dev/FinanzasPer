@@ -74,11 +74,15 @@ st.markdown(f"**Comprometido a futuro (tarjeta/deuda):** ${egresos_futuros:,.2f}
 hoy = datetime.date.today()
 df["vencimiento"] = pd.to_datetime(df["vencimiento"], errors="coerce")
 
+hoy = pd.Timestamp("today").normalize()
+df["vencimiento"] = pd.to_datetime(df["vencimiento"], errors="coerce")
+
 proximos = df[
     (df["tipo"] == "Egreso futuro (tarjeta o deuda)") &
     (df["vencimiento"].notna()) &
-    (df["vencimiento"].dt.date <= hoy + datetime.timedelta(days=7))
+    (df["vencimiento"] <= hoy + pd.Timedelta(days=7))
 ]
+
 
 if not proximos.empty:
     st.warning("⚠️ Próximos vencimientos en 7 días:")
