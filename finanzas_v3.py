@@ -1,107 +1,91 @@
 
 import streamlit as st
 import pandas as pd
+from datetime import date
 from streamlit_option_menu import option_menu
-from datetime import datetime
+import os
 
-st.set_page_config(layout="wide")
+# Inicialización
+st.set_page_config(page_title="FINANZAS v3", layout="wide")
+archivo = "finanzas.csv"
 
-st.markdown(
-    "<h1 style='text-align: center; color: green;'>💸 FINANZAS v3 – Panel General</h1>",
-    unsafe_allow_html=True
-)
+# Carga de datos
+if os.path.exists(archivo):
+    df = pd.read_csv(archivo)
+    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+else:
+    df = pd.DataFrame(columns=["fecha", "detalle", "monto", "tipo", "vencimiento", "prioridad"])
 
-# Inicializar dataset
-if "df" not in st.session_state:
-    st.session_state.df = pd.DataFrame(columns=["fecha", "detalle", "monto", "tipo", "vencimiento", "prioridad"])
+# Navegación
+with st.sidebar:
+    seleccion = option_menu("FINANZAS v3 – Panel General", ["Registrar", "Calendario", "Proyección", "Ahorros Auto"],
+                            icons=["pencil-fill", "calendar2-week", "graph-up", "piggy-bank"],
+                            menu_icon="cash-coin", default_index=0, orientation="horizontal")
 
-# Menú de navegación
-selected = option_menu(
-    menu_title=None,
-    options=["Registrar", "Calendario", "Proyección", "Ahorros Auto"],
-    icons=["pencil-fill", "calendar2-week", "graph-up", "piggy-bank-fill"],
-    menu_icon="cast",
-    orientation="horizontal",
-)
+# 1. Registro de movimientos
+if seleccion == "Registrar":
+    st.subheader("Registrar Movimiento")
+    tipo = st.radio("Tipo de movimiento", ["Ingreso", "Gasto"], horizontal=True)
+    fecha = st.date_input("Fecha", value=date.today())
+    detalle = st.text_input("Detalle del movimiento")
+    monto = st.number_input("Monto", min_value=0.0, step=100.0)
 
-st.write(f"Tab actual seleccionado: {selected}")
-
-# --- Registrar nuevo movimiento ---
-if selected == "Registrar":
-    st.subheader("Registrar nuevo movimiento")
-
-    with st.form("registro_form"):
-        fecha = st.date_input("Fecha", value=datetime.today())
-        detalle = st.text_input("Detalle")
-        monto = st.number_input("Monto", step=100.0)
-        tipo = st.selectbox("Tipo de movimiento", ["Ingreso", "Gasto"])
-        vencimiento = st.date_input("Fecha de vencimiento (si aplica)", value=datetime.today())
-        prioridad = st.select_slider("Prioridad", options=["Baja", "Media", "Alta"])
-        submitted = st.form_submit_button("Registrar")
-
-        if submitted:
-            nuevo = {
-                "fecha": fecha,
-                "detalle": detalle,
-                "monto": monto,
-                "tipo": tipo,
-                "vencimiento": vencimiento,
-                "prioridad": prioridad
-            }
-            st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([nuevo])], ignore_index=True)
-            st.success("Movimiento registrado correctamente.")
-
-    st.dataframe(st.session_state.df)
-
-
-# --- Calendario corregido ---
-elif selected == "Calendario":
-    st.subheader("Calendario de vencimientos")
-
-    df = st.session_state.df.copy()
-    if not df.empty:
-        df["vencimiento"] = pd.to_datetime(df["vencimiento"], errors="coerce")
-        vencimientos_mes = df[df["vencimiento"].notna()]
-        vencimientos_mes["día"] = vencimientos_mes["vencimiento"].dt.strftime("%d-%b")
-
-        # Mostrar resumen por día
-        resumen = vencimientos_mes.groupby("día")[["detalle", "monto", "prioridad"]].agg(lambda x: ', '.join(map(str, x)))
-        st.dataframe(resumen)
-
-        # Tabla colorida por vencimiento
-        st.markdown("### Vista simplificada")
-        for _, row in vencimientos_mes.iterrows():
-            color = "🟢"
-            if row["vencimiento"].date() < datetime.today().date():
-                color = "🔴"
-            elif (row["vencimiento"].date() - datetime.today().date()).days <= 7:
-                color = "🟡"
-            st.markdown(f"{color} `{row['vencimiento'].date()}` → **{row['detalle']}** (${row['monto']}) – `{row['prioridad']}`")
+    vencimiento = st.date_input("Fecha de vencimiento (si aplica)", value=None)
+    if tipo == "Gasto" and vencimiento:
+        prioridad = st.radio("Prioridad", ["Alta", "Media", "Baja"], horizontal=True)
     else:
-        st.info("No hay datos registrados con vencimiento.")
+        prioridad = "-"
 
+    if st.button("Registrar"):
+        nuevo = pd.DataFrame([{
+            "fecha": fecha,
+            "detalle": detalle,
+            "monto": monto,
+            "tipo": tipo,
+            "vencimiento": vencimiento if vencimiento else "",
+            "prioridad": prioridad
+        }])
+        df = pd.concat([df, nuevo], ignore_index=True)
+        df.to_csv(archivo, index=False)
+        st.success("Movimiento registrado correctamente.")
 
-# --- Proyección Anual ---
-elif selected == "Proyección":
+    st.dataframe(df)
+
+# 2. Calendario
+elif seleccion == "Calendario":
+    st.subheader("Calendario de movimientos")
+
+    hoy = pd.Timestamp("today").normalize()
+    df["vencimiento"] = pd.to_datetime(df["vencimiento"], errors="coerce")
+
+    def color_fila(row):
+        if pd.isna(row["vencimiento"]):
+            return ""
+        elif row["vencimiento"] < hoy:
+            return "color: red"
+        elif row["vencimiento"] == hoy:
+            return "color: orange"
+        elif row["vencimiento"] > hoy:
+            return "color: green"
+        return ""
+
+    st.dataframe(df.style.applymap(color_fila, subset=["vencimiento"]))
+
+# 3. Proyección mensual
+elif seleccion == "Proyección":
     st.subheader("Proyección de ingresos y egresos")
-    df = st.session_state.df.copy()
-    if not df.empty:
-        df["mes"] = pd.to_datetime(df["fecha"]).dt.to_period("M")
-        resumen = df.groupby(["mes", "tipo"])["monto"].sum().unstack(fill_value=0)
-        resumen["Balance"] = resumen.get("Ingreso", 0) - resumen.get("Gasto", 0)
-        st.line_chart(resumen["Balance"])
-        st.dataframe(resumen)
-    else:
-        st.info("Aún no hay proyecciones para mostrar.")
+    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["mes"] = df["fecha"].dt.to_period("M").astype(str)
 
-# --- Ahorros Auto ---
-elif selected == "Ahorros Auto":
-    st.subheader("Ahorros para el auto")
-    df = st.session_state.df.copy()
-    if not df.empty:
-        auto_ahorros = df[(df["tipo"] == "Ingreso") & (df["detalle"].str.lower().str.contains("auto"))]
-        total_auto = auto_ahorros["monto"].sum()
-        st.metric("Total ahorrado para el auto", f"${total_auto:,.2f}")
-        st.dataframe(auto_ahorros)
-    else:
-        st.info("No hay movimientos relacionados con el auto.")
+    proyeccion = df.groupby(["mes", "tipo"])["monto"].sum().unstack(fill_value=0)
+    proyeccion["Balance"] = proyeccion.get("Ingreso", 0) - proyeccion.get("Gasto", 0)
+
+    st.bar_chart(proyeccion)
+
+# 4. Ahorros para el auto
+elif seleccion == "Ahorros Auto":
+    st.subheader("Fondo de Ahorro para el Auto")
+    ahorros = df[(df["tipo"] == "Ingreso") & (df["detalle"].str.contains("auto", case=False))]
+    total = ahorros["monto"].sum()
+    st.metric("Total Ahorrado", f"${total:,.2f}")
+    st.dataframe(ahorros)
