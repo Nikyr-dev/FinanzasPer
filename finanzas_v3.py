@@ -1,122 +1,90 @@
 import streamlit as st
 import pandas as pd
 import os
-from streamlit_option_menu import option_menu
+import streamlit.components.v1 as components
 
-# BLOQUE 1: Configuración inicial
-st.set_page_config(page_title="Finanzas v3", layout="wide")
+# ---- CONFIGURACIÓN GENERAL ----
+st.set_page_config(page_title="Finanzas v3 - 2025", page_icon="💸", layout="wide")
+
+# Fondo amarillo positano
 st.markdown(
-    """
+    '''
     <style>
     body {
         background-color: #FFD93D;
     }
     </style>
-    """,
+    ''',
     unsafe_allow_html=True
 )
 
-# BLOQUE 2: Nombre del archivo CSV
+# ---- BLOQUE 2: Gestión del archivo CSV ----
 archivo = "finanzas.csv"
 
-# BLOQUE 3: Cargar datos existentes si hay
 if os.path.exists(archivo):
     df = pd.read_csv(archivo)
 else:
     df = pd.DataFrame(columns=["fecha", "detalle", "monto", "tipo", "vencimiento", "prioridad"])
 
-# BLOQUE 4: Menú circular
-with st.sidebar:
-    menu = option_menu(
-        "Ir a...", 
-        ["Registrar Movimiento", "Calendario", "Ahorros para Auto", "Distribución Inteligente"], 
-        icons=["pencil", "calendar", "car-front-fill", "graph-up"],
-        menu_icon="cast", 
-        default_index=0,
-        orientation="vertical"
-    )
+# ---- BLOQUE 3.1: Registro de movimientos ----
+st.title("💸 Finanzas v3 - Panel General")
 
-# BLOQUE 5: Registro de movimientos
-if menu == "Registrar Movimiento":
-    st.header("📝 Registrar Movimiento")
+secciones = ["Registrar Movimiento", "Calendario", "Ahorros Auto"]
+seleccion = st.sidebar.radio("Ir a...", secciones)
 
-    tipo = st.radio("Tipo de movimiento", ["Ingreso", "Gasto"])
+if seleccion == "Registrar Movimiento":
+    st.header("Registrar Nuevo Movimiento")
+
+    tipo = st.radio("Tipo de movimiento", ("Ingreso", "Gasto"))
+
     fecha = st.date_input("Fecha del movimiento")
     detalle = st.text_input("Detalle")
-    monto = st.number_input("Monto", min_value=0.0, step=10.0)
-    vencimiento = st.date_input("Fecha de vencimiento (si aplica)", value=None)
-    
-    prioridad = ""
-    if tipo == "Gasto":
-        prioridad = st.radio("Prioridad", ["Alta", "Media", "Baja"])
-    
+    monto = st.number_input("Monto", min_value=0.0, format="%.2f")
+
+    vencimiento = st.date_input("Fecha de vencimiento (si aplica)")
+    prioridad = st.selectbox("Prioridad", ["Alta", "Media", "Baja"])
+
+    if tipo == "Ingreso":
+        st.subheader("📈 Distribución automática del ingreso")
+
+        ahorro_pct = st.slider("Ahorro (%)", 0, 100, 10)
+        inversion_pct = st.slider("Inversión (%)", 0, 100, 10)
+        auto_pct = st.slider("Fondo para Auto (%)", 0, 100, 10)
+        gastos_basicos_pct = st.slider("Gastos básicos (%)", 0, 100, 50)
+        gustos_pct = st.slider("Gustos personales (%)", 0, 100, 20)
+        emergencia_pct = st.slider("Emergencias / Oportunidad (%)", 0, 100, 10)
+
+        total_pct = ahorro_pct + inversion_pct + auto_pct + gastos_basicos_pct + gustos_pct + emergencia_pct
+
+        if total_pct != 100:
+            st.error(f"La suma de porcentajes es {total_pct}%. ¡Debe ser exactamente 100%!")
+        else:
+            st.success("✅ ¡Distribución lista para aplicar!")
+
     if st.button("Registrar"):
-        nuevo_registro = {
-            "fecha": fecha,
-            "detalle": detalle,
-            "monto": monto,
-            "tipo": tipo,
-            "vencimiento": vencimiento if vencimiento else "",
-            "prioridad": prioridad
-        }
-        df = pd.concat([df, pd.DataFrame([nuevo_registro])], ignore_index=True)
+        nuevo_mov = pd.DataFrame({
+            "fecha": [fecha],
+            "detalle": [detalle],
+            "monto": [monto],
+            "tipo": [tipo],
+            "vencimiento": [vencimiento],
+            "prioridad": [prioridad]
+        })
+
+        df = pd.concat([df, nuevo_mov], ignore_index=True)
+        
+        # ---- BLOQUE 5.1: Guardado automático ----
         df.to_csv(archivo, index=False)
-        st.success("✅ Movimiento registrado correctamente.")
+        st.success("✅ Movimiento guardado exitosamente.")
 
-# BLOQUE 6: Calendario
-if menu == "Calendario":
-    import streamlit_calendar as st_calendar
-    from datetime import timedelta
+elif seleccion == "Calendario":
+    st.header("📅 Calendario (en desarrollo)")
 
-    eventos = []
-    if os.path.exists(archivo):
-        for index, row in df.iterrows():
-            evento = {
-                "title": f"{row['detalle']} (${row['monto']})",
-                "start": row['fecha'],
-                "end": (pd.to_datetime(row['fecha']) + timedelta(days=1)).strftime('%Y-%m-%d')
-            }
-            eventos.append(evento)
+elif seleccion == "Ahorros Auto":
+    st.header("🚗 Fondo de Ahorro para el Auto")
 
-    st.header("📅 Calendario de movimientos")
-    st_calendar.calendar(events=eventos)
-
-# BLOQUE 7: Ahorros para Auto
-st.subheader("🚗 Fondo de Ahorro para el Auto")
-
-# Aseguramos que 'detalle' sea string
-df["detalle"] = df["detalle"].astype(str)
-
-# Filtramos los movimientos que tengan "auto" en el detalle
-df_auto = df[df["detalle"].str.contains("auto", case=False, na=False)]
-
-# Sumamos los montos
-total_auto = df_auto["monto"].sum()
-
-# Mostramos el total ahorrado
-st.success(f"Total Ahorrado para el Auto: ${total_auto:,.2f}")
-
-        
-        
-
-# BLOQUE 8: Distribución Inteligente estilo millonario
-if menu == "Distribución Inteligente":
-    st.header("💎 Distribución Automática de Ingresos (Estilo Millonario)")
-
-    ingreso = st.number_input("Ingresá tu nuevo ingreso 💵", min_value=0.0, step=100.0)
-
-    if ingreso > 0:
-        ahorro = ingreso * 0.10
-        inversion = ingreso * 0.10
-        fondo_auto = ingreso * 0.10
-        gastos_basicos = ingreso * 0.50
-        gustos = ingreso * 0.10
-        emergencias = ingreso * 0.10
-
-        st.success("✅ Ingreso procesado bajo mentalidad millonaria:")
-        st.markdown(f"- **Ahorro:** ${ahorro:,.2f}")
-        st.markdown(f"- **Inversión:** ${inversion:,.2f}")
-        st.markdown(f"- **Fondo Auto:** ${fondo_auto:,.2f}")
-        st.markdown(f"- **Gastos Básicos:** ${gastos_basicos:,.2f}")
-        st.markdown(f"- **Gustos Personales:** ${gustos:,.2f}")
-        st.markdown(f"- **Emergencias/Oportunidades:** ${emergencias:,.2f}")
+    if "auto" in df["detalle"].astype(str).str.lower().values:
+        total_auto = df[df["detalle"].str.contains("auto", case=False, na=False)]["monto"].sum()
+        st.metric(label="💰 Total Fondo Auto", value=f"${total_auto:,.2f}")
+    else:
+        st.info("Todavía no hay registros destinados al ahorro para auto.")
