@@ -82,14 +82,22 @@ if menu == "Calendario":
     st_calendar.calendar(events=eventos)
 
 # BLOQUE 7: Ahorros para Auto
-if menu == "Ahorros para Auto":
-    st.header("🚗 Fondo de Ahorro para el Auto")
-    if os.path.exists(archivo):
-        df_auto = df[df["detalle"].str.contains("auto", case=False, na=False)]
-        total_ahorro_auto = df_auto["monto"].sum()
-        st.metric(label="Total Ahorro Acumulado", value=f"${total_ahorro_auto:,.2f}")
-    else:
-        st.warning("⚠️ No hay datos disponibles todavía.")
+st.subheader("🚗 Fondo de Ahorro para el Auto")
+
+# Aseguramos que 'detalle' sea string
+df["detalle"] = df["detalle"].astype(str)
+
+# Filtramos los movimientos que tengan "auto" en el detalle
+df_auto = df[df["detalle"].str.contains("auto", case=False, na=False)]
+
+# Sumamos los montos
+total_auto = df_auto["monto"].sum()
+
+# Mostramos el total ahorrado
+st.success(f"Total Ahorrado para el Auto: ${total_auto:,.2f}")
+
+        
+        
 
 # BLOQUE 8: Distribución Inteligente estilo millonario
 if menu == "Distribución Inteligente":
