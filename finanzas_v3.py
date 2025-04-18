@@ -56,7 +56,7 @@ if seleccion == "Registrar":
 
 # --- Distribución automática de ingresos estilo millonario ---
 if seleccion == "Registrar" and tipo == "Ingreso":
-    st.markdown("### Distribución automática del ingreso")
+    st.markdown    ("### Distribución automática del ingreso")
 
     # Porcentajes ajustables
     ahorro_pct = st.slider("Ahorro (%)", 0, 100, 10)
